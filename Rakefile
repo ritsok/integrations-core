@@ -69,6 +69,19 @@ def print_inconsistencies(display_name, inconsistencies)
   end
 end
 
+def os
+  case RUBY_PLATFORM
+  when /linux/
+    "linux"
+  when /darwin/
+    "mac_os"
+  when /x64-mingw32/
+    "windows"
+  else
+    fail 'Unsupported OS'
+  end
+end
+
 desc 'Outputs the checks/example configs of this repo that do not match the ones in `dd-agent` (temporary task)'
 task dd_agent_consistency: [:pull_latest_agent] do
   print_inconsistencies(
@@ -79,4 +92,55 @@ task dd_agent_consistency: [:pull_latest_agent] do
     'yaml example file',
     find_inconsistencies(find_yaml_confs, 'conf.d')
   )
+end
+
+desc 'Copy checks over the given path'
+task :copy_checks do
+  conf_dir = ENV['conf_dir']
+  if conf_dir.to_s.empty?
+    fail "please specify 'conf_dir' param"
+  end
+
+  checks_dir = ENV['checks_dir']
+  if checks_dir.to_s.empty?
+    fail "please specify 'checks_dir' param"
+  end
+
+  Dir.glob("*/").each do |check|
+    check.slice! "/"
+
+    # Check the manifest to be sure that this check is enabled on this system
+    # or skip this iteration
+    manifest_file_path = "#{check}/manifest.json"
+
+    # If there is no manifest file, then we should assume the folder does not
+    # contain a working check and move onto the next
+    File.exist?(manifest_file_path) || next
+
+    manifest = JSON.parse(File.read(manifest_file_path))
+    manifest['supported_os'].include?(os) || next
+
+    # Copy the checks over
+    if File.exists? "#{check}/check.py"
+      copy "#{check}/check.py", "#{checks_dir}/#{check}.py"
+    end
+
+    # Copy the check config to the conf directories
+    if File.exists? "#{check}/conf.yaml.example"
+      copy "#{check}/conf.yaml.example", "#{conf_dir}/#{check}.yaml.example"
+    end
+
+    # Copy the default config, if it exists
+    if File.exists? "#{check}/conf.yaml.default"
+      copy "#{check}/conf.yaml.default", "#{conf_dir}/#{check}.yaml.default"
+    end
+
+    # We don't have auto_conf on windows yet
+    if os != "windows"
+      if File.exists? "#{check}/auto_conf.yaml"
+        copy "#{check}/auto_conf.yaml", "#{conf_dir}/auto_conf/#{check}.yaml"
+      end
+    end
+  end
+
 end
