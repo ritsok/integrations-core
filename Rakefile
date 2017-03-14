@@ -106,6 +106,8 @@ task :copy_checks do
     fail "please specify 'checks_dir' param"
   end
 
+  all_reqs_file = File.open("check_requirements.txt", "w+")
+
   Dir.glob("*/").each do |check|
     check.slice! "/"
 
@@ -141,6 +143,16 @@ task :copy_checks do
         copy "#{check}/auto_conf.yaml", "#{conf_dir}/auto_conf/#{check}.yaml"
       end
     end
+
+    if File.exists?("#{check}/requirements.txt") && !manifest['use_omnibus_reqs']
+      reqs = File.open("#{check}/requirements.txt", 'r').read
+      reqs.each_line do |line|
+        if line[0] != '#'
+          all_reqs_file.puts line
+        end
+      end
+    end
   end
 
+  all_reqs_file.close
 end
