@@ -16,8 +16,12 @@ end
 
 ENV['SDK_HOME'] = File.dirname(__FILE__)
 
-spec = Gem::Specification.find_by_name 'datadog-sdk-testing'
-load "#{spec.gem_dir}/lib/tasks/sdk.rake"
+begin
+  spec = Gem::Specification.find_by_name 'datadog-sdk-testing'
+  load "#{spec.gem_dir}/lib/tasks/sdk.rake"
+rescue => e
+  p e.message
+end
 
 def find_check_files
   Dir.glob("#{ENV['SDK_HOME']}/*/check.py").collect do |file_path|
